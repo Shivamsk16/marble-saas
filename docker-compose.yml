@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: marblepro
+      POSTGRES_PASSWORD: marblepro
+      POSTGRES_DB: marblepro
+    ports:
+      - "5432:5432"
+    volumes:
+      - marblepro_pg:/var/lib/postgresql/data
+
+volumes:
+  marblepro_pg:
