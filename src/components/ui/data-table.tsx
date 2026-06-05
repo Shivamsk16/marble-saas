@@ -209,6 +209,16 @@ export function DataTable<T extends { id: string }>({
               {columns.map((col) => (
                 <th
                   key={col.id}
+                  scope="col"
+                  aria-sort={
+                    col.sortValue
+                      ? sortCol === col.id
+                        ? sortDir === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                      : undefined
+                  }
                   className={cn("p-3 text-left font-medium text-[var(--text-muted)]", col.className)}
                 >
                   {col.sortValue ? (
@@ -216,12 +226,13 @@ export function DataTable<T extends { id: string }>({
                       type="button"
                       className="inline-flex items-center gap-1 hover:text-[var(--text)]"
                       onClick={() => toggleSort(col.id)}
+                      aria-label={`Sort by ${col.header}`}
                     >
                       {col.header}
                       {sortCol === col.id ? (
-                        sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+                        sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" /> : <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
                       ) : (
-                        <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+                        <ArrowUpDown className="h-3.5 w-3.5 opacity-40" aria-hidden="true" />
                       )}
                     </button>
                   ) : (
@@ -289,27 +300,46 @@ export function DataTable<T extends { id: string }>({
       </div>
 
       <div className="flex items-center justify-between px-3 py-2 border-t border-[var(--border-subtle)] text-[var(--text-sm)] text-[var(--text-muted)]">
-        <span>
+        <span aria-live="polite">
           {filtered.length === 0 ? "0" : page * pageSize + 1}–{Math.min((page + 1) * pageSize, filtered.length)} of {filtered.length}
         </span>
-        <div className="flex items-center gap-2">
+        <nav className="flex items-center gap-2" aria-label="Table pagination">
+          <label className="sr-only" htmlFor="data-table-page-size">
+            Rows per page
+          </label>
           <select
+            id="data-table-page-size"
             value={pageSize}
             onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
+            aria-label="Rows per page"
             className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-2 text-[var(--text-sm)]"
           >
             {[10, 20, 50, 100].map((n) => (
-              <option key={n} value={n}>{n} / page</option>
+              <option key={n} value={n}>{n} per page</option>
             ))}
           </select>
-          <Button variant="outline" size="icon" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-            <ChevronLeft className="h-4 w-4" />
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={page === 0}
+            onClick={() => setPage((p) => p - 1)}
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </Button>
-          <span className="tabular-nums">{page + 1} / {totalPages}</span>
-          <Button variant="outline" size="icon" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
-            <ChevronRight className="h-4 w-4" />
+          <span className="tabular-nums" aria-current="page">
+            Page {page + 1} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={page >= totalPages - 1}
+            onClick={() => setPage((p) => p + 1)}
+            aria-label="Next page"
+          >
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </Button>
-        </div>
+        </nav>
       </div>
     </div>
   );

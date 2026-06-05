@@ -21,6 +21,8 @@ export async function getDashboardStats(tenantId: string) {
   ewbEnd.setDate(ewbEnd.getDate() + 1);
   const weekAgo = daysAgo(7);
 
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
   const [
     slabsInStock,
     slabsInCutting,
@@ -40,6 +42,9 @@ export async function getDashboardStats(tenantId: string) {
     revenuePrev7,
     productionLast7,
     unreadNotifications,
+    invoicesThisMonth,
+    collectionsThisMonth,
+    gstThisMonth,
   ] = await Promise.all([
     prisma.slab.count({ where: { tenantId, status: "in_stock" } }),
     prisma.slab.count({ where: { tenantId, status: "in_cutting" } }),
@@ -104,6 +109,28 @@ export async function getDashboardStats(tenantId: string) {
     prisma.notification.count({
       where: { tenantId, readAt: null },
     }),
+    prisma.invoice.count({
+      where: {
+        tenantId,
+        type: "tax",
+        invoiceDate: { gte: monthStart, lt: tomorrow },
+      },
+    }),
+    prisma.payment.aggregate({
+      where: {
+        invoice: { tenantId },
+        paidAt: { gte: monthStart, lt: tomorrow },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.invoice.aggregate({
+      where: {
+        tenantId,
+        type: "tax",
+        invoiceDate: { gte: monthStart, lt: tomorrow },
+      },
+      _sum: { cgst: true, sgst: true, igst: true },
+    }),
   ]);
 
   const revenue7Total = revenueLast7.reduce((s, d) => s + d.amount, 0);
@@ -142,6 +169,12 @@ export async function getDashboardStats(tenantId: string) {
     productionSparkline: productionLast7.map((d) => d.count),
     delayedOrders: delayedCount,
     unreadNotifications,
+    invoicesThisMonth,
+    collectionsThisMonth: Number(collectionsThisMonth._sum.amount ?? 0),
+    gstCollectedThisMonth:
+      Number(gstThisMonth._sum.cgst ?? 0) +
+      Number(gstThisMonth._sum.sgst ?? 0) +
+      Number(gstThisMonth._sum.igst ?? 0),
   };
 }
 

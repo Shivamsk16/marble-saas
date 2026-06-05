@@ -22,7 +22,12 @@ export default async function AppLayout({
   });
 
   return (
-    <AppShell tenantName={tenant?.name} roleName={session.roleName} userName={user?.fullName ?? undefined}>
+    <AppShell
+      tenantName={tenant?.name}
+      roleName={session.roleName}
+      permissions={session.permissions}
+      userName={user?.fullName ?? undefined}
+    >
       {children}
     </AppShell>
   );

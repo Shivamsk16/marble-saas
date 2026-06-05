@@ -7,20 +7,47 @@ import { apiError } from "@/lib/api-utils";
 
 const createSchema = z.object({
   name: z.string().min(1),
-  phone: z.string().optional(),
+  phone: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  emergencyContact: z.string().optional().nullable(),
   role: z.enum(["cutter_operator", "loader", "polisher", "helper"]),
-  dailyWage: z.number().positive().optional(),
-  monthlySalary: z.number().positive().optional(),
+  dailyWage: z.number().positive().optional().nullable(),
+  monthlySalary: z.number().positive().optional().nullable(),
+  joiningDate: z.string().optional(),
 });
 
-export async function GET() {
+function serializeWorker(w: {
+  id: string;
+  name: string;
+  phone: string | null;
+  address: string | null;
+  emergencyContact: string | null;
+  role: string;
+  dailyWage: { toString(): string } | null;
+  monthlySalary: { toString(): string } | null;
+  joiningDate: Date | null;
+  isActive: boolean;
+  createdAt: Date;
+}) {
+  return {
+    ...w,
+    dailyWage: w.dailyWage ? Number(w.dailyWage) : null,
+    monthlySalary: w.monthlySalary ? Number(w.monthlySalary) : null,
+  };
+}
+
+export async function GET(request: Request) {
   try {
     const session = await requirePermission(PERMISSIONS.labour_read);
+    const includeInactive = new URL(request.url).searchParams.get("all") === "true";
     const workers = await prisma.worker.findMany({
-      where: { tenantId: session.tenantId, isActive: true },
+      where: {
+        tenantId: session.tenantId,
+        ...(includeInactive ? {} : { isActive: true }),
+      },
       orderBy: { name: "asc" },
     });
-    return NextResponse.json({ workers });
+    return NextResponse.json({ workers: workers.map(serializeWorker) });
   } catch (e) {
     return apiError(e);
   }
@@ -35,13 +62,15 @@ export async function POST(request: Request) {
         tenantId: session.tenantId,
         name: data.name,
         phone: data.phone,
+        address: data.address,
+        emergencyContact: data.emergencyContact,
         role: data.role,
         dailyWage: data.dailyWage,
         monthlySalary: data.monthlySalary,
-        joiningDate: new Date(),
+        joiningDate: data.joiningDate ? new Date(data.joiningDate) : new Date(),
       },
     });
-    return NextResponse.json({ worker }, { status: 201 });
+    return NextResponse.json({ worker: serializeWorker(worker) }, { status: 201 });
   } catch (e) {
     return apiError(e);
   }

@@ -47,6 +47,7 @@ const statusMap: Record<string, BadgeVariant> = {
   partial: "warning",
   paid: "success",
   active: "success",
+  inactive: "neutral",
   idle: "neutral",
   cutting: "info",
   maintenance: "warning",

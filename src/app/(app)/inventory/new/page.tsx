@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
+import { fetchJson } from "@/lib/client-fetch";
 
 const categories = [
   "marble",
@@ -21,30 +24,56 @@ export default function NewProductPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
     setError("");
     const fd = new FormData(e.currentTarget);
-    const res = await fetch("/api/inventory/products", {
+    const name = String(fd.get("name") ?? "").trim();
+    const category = String(fd.get("category") ?? "").trim();
+    const sizeL = fd.get("sizeL") ? Number(fd.get("sizeL")) : undefined;
+    const sizeW = fd.get("sizeW") ? Number(fd.get("sizeW")) : undefined;
+    const rateSqft = fd.get("rateSqft") ? Number(fd.get("rateSqft")) : undefined;
+    const minStockAlert = Number(fd.get("minStockAlert") || 0);
+
+    const nextErrors: Record<string, string> = {};
+    if (!name) nextErrors["product-name"] = "Product name is required";
+    if (!category) nextErrors["product-category"] = "Category is required";
+    if (sizeL !== undefined && (Number.isNaN(sizeL) || sizeL <= 0)) {
+      nextErrors["product-size-l"] = "Length must be a positive number";
+    }
+    if (sizeW !== undefined && (Number.isNaN(sizeW) || sizeW <= 0)) {
+      nextErrors["product-size-w"] = "Width must be a positive number";
+    }
+    if (rateSqft !== undefined && (Number.isNaN(rateSqft) || rateSqft <= 0)) {
+      nextErrors["product-rate"] = "Rate must be a positive number";
+    }
+    if (Number.isNaN(minStockAlert) || minStockAlert < 0) {
+      nextErrors["product-min-stock"] = "Min stock alert cannot be negative";
+    }
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
+
+    setLoading(true);
+    const result = await fetchJson("/api/inventory/products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: fd.get("name"),
-        category: fd.get("category"),
+        name,
+        category,
         origin: fd.get("origin") || undefined,
         color: fd.get("color") || undefined,
         finish: fd.get("finish") || undefined,
-        sizeL: fd.get("sizeL") ? Number(fd.get("sizeL")) : undefined,
-        sizeW: fd.get("sizeW") ? Number(fd.get("sizeW")) : undefined,
-        rateSqft: fd.get("rateSqft") ? Number(fd.get("rateSqft")) : undefined,
-        minStockAlert: Number(fd.get("minStockAlert") || 0),
+        sizeL,
+        sizeW,
+        rateSqft,
+        minStockAlert,
       }),
     });
     setLoading(false);
-    if (!res.ok) {
-      setError("Could not save product");
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
     router.push("/inventory");
@@ -61,74 +90,43 @@ export default function NewProductPage() {
           { label: "Add product" },
         ]}
       />
-      {error && (
-        <div className="text-[var(--text-sm)] text-[var(--danger)] mb-4 bg-[var(--danger-subtle)] rounded-[var(--radius-md)] p-3">
-          {error}
-        </div>
-      )}
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="product-name" className="block text-[var(--text-sm)] font-medium mb-1.5">
-            Name *
-          </label>
-          <Input id="product-name" name="name" required />
-        </div>
-        <div>
-          <label htmlFor="product-category" className="block text-[var(--text-sm)] font-medium mb-1.5">
-            Category *
-          </label>
-          <Select id="product-category" name="category" required defaultValue={categories[0]}>
+      {error && <Alert variant="danger">{error}</Alert>}
+      <form onSubmit={onSubmit} className="space-y-4" noValidate>
+        <FormField label="Name" htmlFor="product-name" required error={fieldErrors["product-name"]}>
+          <Input name="name" />
+        </FormField>
+        <FormField label="Category" htmlFor="product-category" required error={fieldErrors["product-category"]}>
+          <Select name="category" defaultValue={categories[0]}>
             {categories.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
             ))}
           </Select>
-        </div>
-        <div>
-          <label htmlFor="product-origin" className="block text-[var(--text-sm)] font-medium mb-1.5">
-            Origin
-          </label>
-          <Input id="product-origin" name="origin" placeholder="Rajasthan, Italy…" />
-        </div>
-        <div>
-          <label htmlFor="product-color" className="block text-[var(--text-sm)] font-medium mb-1.5">
-            Color
-          </label>
-          <Input id="product-color" name="color" />
-        </div>
-        <div>
-          <label htmlFor="product-finish" className="block text-[var(--text-sm)] font-medium mb-1.5">
-            Finish
-          </label>
-          <Input id="product-finish" name="finish" placeholder="polished, honed…" />
-        </div>
+        </FormField>
+        <FormField label="Origin" htmlFor="product-origin">
+          <Input name="origin" placeholder="Rajasthan, Italy…" />
+        </FormField>
+        <FormField label="Color" htmlFor="product-color">
+          <Input name="color" />
+        </FormField>
+        <FormField label="Finish" htmlFor="product-finish">
+          <Input name="finish" placeholder="polished, honed…" />
+        </FormField>
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="product-size-l" className="block text-[var(--text-sm)] font-medium mb-1.5">
-              Length (mm)
-            </label>
-            <Input id="product-size-l" name="sizeL" type="number" />
-          </div>
-          <div>
-            <label htmlFor="product-size-w" className="block text-[var(--text-sm)] font-medium mb-1.5">
-              Width (mm)
-            </label>
-            <Input id="product-size-w" name="sizeW" type="number" />
-          </div>
+          <FormField label="Length (mm)" htmlFor="product-size-l" error={fieldErrors["product-size-l"]}>
+            <Input name="sizeL" type="number" min={1} />
+          </FormField>
+          <FormField label="Width (mm)" htmlFor="product-size-w" error={fieldErrors["product-size-w"]}>
+            <Input name="sizeW" type="number" min={1} />
+          </FormField>
         </div>
-        <div>
-          <label htmlFor="product-rate" className="block text-[var(--text-sm)] font-medium mb-1.5">
-            Rate per sqft (₹)
-          </label>
-          <Input id="product-rate" name="rateSqft" type="number" step="0.01" />
-        </div>
-        <div>
-          <label htmlFor="product-min-stock" className="block text-[var(--text-sm)] font-medium mb-1.5">
-            Min stock alert (slab count)
-          </label>
-          <Input id="product-min-stock" name="minStockAlert" type="number" defaultValue={0} />
-        </div>
+        <FormField label="Rate per sqft (₹)" htmlFor="product-rate" error={fieldErrors["product-rate"]}>
+          <Input name="rateSqft" type="number" step="0.01" min={0.01} />
+        </FormField>
+        <FormField label="Min stock alert (slab count)" htmlFor="product-min-stock" error={fieldErrors["product-min-stock"]}>
+          <Input name="minStockAlert" type="number" min={0} defaultValue={0} />
+        </FormField>
         <div className="flex flex-wrap items-center gap-2 pt-2">
           <Button type="submit" disabled={loading} loading={loading}>
             Save product

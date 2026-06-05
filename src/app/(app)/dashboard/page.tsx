@@ -2,6 +2,13 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { getInventorySummary } from "@/lib/inventory";
 import { getDashboardStats, getAttentionItems } from "@/lib/reports";
+import {
+  getRoleDashboardKpis,
+  getRoleHeaderActions,
+  getRoleQuickActions,
+  showLowStockPanel,
+  showRevenueChart,
+} from "@/lib/dashboard-config";
 import { prisma } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/ui/kpi-card";
@@ -19,9 +26,28 @@ import {
   Wrench,
 } from "lucide-react";
 
+const quickActionIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+  "/invoices/new": IndianRupee,
+  "/invoices": IndianRupee,
+  "/orders": Package,
+  "/production": Wrench,
+  "/inventory": Package,
+  "/inventory/slabs": Package,
+  "/labour/attendance": Users,
+  "/labour/tasks": ClipboardList,
+  "/reports": ClipboardList,
+  "/clients": Users,
+  "/ewb": Truck,
+  "/my-tasks": ClipboardList,
+  "/guidelines": ClipboardList,
+  "/cutter": Wrench,
+};
+
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) return null;
+
+  const role = session.roleName;
 
   const [inventory, tenant, stats, attention] = await Promise.all([
     getInventorySummary(session.tenantId),
@@ -30,54 +56,9 @@ export default async function DashboardPage() {
     getAttentionItems(session.tenantId),
   ]);
 
-  const kpis = [
-    {
-      label: "Today's Production",
-      value: stats.todayProduction,
-      href: "/production",
-      trend: undefined as number | undefined,
-      sparkline: stats.productionSparkline,
-    },
-    {
-      label: "Orders in Progress",
-      value: stats.ordersInProgress,
-      href: "/orders",
-      trendLabel: stats.delayedOrders > 0 ? `${stats.delayedOrders} delayed` : undefined,
-    },
-    {
-      label: "Pending Deliveries",
-      value: stats.pendingDeliveries,
-      href: "/orders?stage=ready_for_dispatch",
-    },
-    {
-      label: "Labour Attendance",
-      value: `${stats.labourPresent}/${stats.labourTotal}`,
-      href: "/labour/attendance",
-    },
-    {
-      label: "Revenue Summary",
-      value: `₹${stats.todaySales.toLocaleString("en-IN")}`,
-      href: "/invoices",
-      trend: stats.revenueTrend,
-      trendLabel: "vs last week",
-      sparkline: stats.revenueSparkline,
-    },
-    {
-      label: "Outstanding Payments",
-      value: `₹${stats.overduePayments.toLocaleString("en-IN")}`,
-      href: "/invoices",
-    },
-    {
-      label: "Inventory Alerts",
-      value: inventory.lowStockAlerts.length,
-      href: "/inventory",
-    },
-    {
-      label: "Critical Tasks",
-      value: stats.criticalTasks,
-      href: "/labour/tasks",
-    },
-  ];
+  const kpis = getRoleDashboardKpis(role, stats, inventory);
+  const headerActions = getRoleHeaderActions(role);
+  const quickActions = getRoleQuickActions(role);
 
   const revenueLabels = stats.revenueSparkline?.map((_, i) =>
     i % 2 === 0 ? ["M", "T", "W", "T", "F", "S", "S"][i] ?? "" : ""
@@ -89,18 +70,19 @@ export default async function DashboardPage() {
         title="Dashboard"
         description={`${tenant?.name ?? "Workspace"} · What needs attention right now`}
         actions={
-          <>
-            <Link href="/invoices/new">
-              <Button>New Invoice</Button>
-            </Link>
-            <Link href="/orders">
-              <Button variant="secondary">View Orders</Button>
-            </Link>
-          </>
+          headerActions.length > 0 ? (
+            <>
+              {headerActions.map((action, i) => (
+                <Link key={action.href} href={action.href}>
+                  <Button variant={i === 0 ? "primary" : "secondary"}>{action.label}</Button>
+                </Link>
+              ))}
+            </>
+          ) : undefined
         }
       />
 
-      {tenant?.trialEndsAt && (
+      {tenant?.trialEndsAt && role === "owner" && (
         <div className="mb-6 rounded-[var(--radius-lg)] border border-[var(--warning)]/30 bg-[var(--warning-subtle)] px-4 py-3 text-[var(--text-sm)]">
           Trial ends {new Date(tenant.trialEndsAt).toLocaleDateString("en-IN")} ·{" "}
           <span className="capitalize">{tenant.plan}</span> plan
@@ -121,58 +103,61 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6 mb-8">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Revenue — Last 7 Days</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <BarChart
-              data={stats.revenueSparkline ?? []}
-              labels={revenueLabels}
-              width={480}
-              height={140}
-            />
-          </CardContent>
-        </Card>
+      {(showRevenueChart(role) || role === "owner" || role === "supervisor") && (
+        <div className="grid lg:grid-cols-3 gap-6 mb-8">
+          {showRevenueChart(role) && (
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Revenue — Last 7 Days</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <BarChart
+                  data={stats.revenueSparkline ?? []}
+                  labels={revenueLabels}
+                  height={140}
+                />
+              </CardContent>
+            </Card>
+          )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-[var(--warning)]" />
-              Needs Attention
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 max-h-[200px] overflow-y-auto">
-            {attention.length === 0 ? (
-              <p className="text-[var(--text-sm)] text-[var(--text-muted)]">All clear — no urgent items</p>
-            ) : (
-              attention.slice(0, 6).map((item, i) => (
-                <Link
-                  key={i}
-                  href={item.link}
-                  className="flex items-start gap-2 p-2 rounded-[var(--radius-md)] hover:bg-[var(--surface-2)] text-[var(--text-sm)]"
-                >
-                  <Badge
-                    variant={
-                      item.severity === "danger"
-                        ? "danger"
-                        : item.severity === "warning"
-                          ? "warning"
-                          : "info"
-                    }
+          <Card className={showRevenueChart(role) ? "" : "lg:col-span-3"}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-[var(--warning)]" />
+                Needs Attention
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 max-h-[200px] overflow-y-auto">
+              {attention.length === 0 ? (
+                <p className="text-[var(--text-sm)] text-[var(--text-muted)]">All clear — no urgent items</p>
+              ) : (
+                attention.slice(0, 6).map((item, i) => (
+                  <Link
+                    key={i}
+                    href={item.link}
+                    className="flex items-start gap-2 p-2 rounded-[var(--radius-md)] hover:bg-[var(--surface-2)] text-[var(--text-sm)]"
                   >
-                    {item.type}
-                  </Badge>
-                  <span className="flex-1 leading-snug">{item.title}</span>
-                </Link>
-              ))
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                    <Badge
+                      variant={
+                        item.severity === "danger"
+                          ? "danger"
+                          : item.severity === "warning"
+                            ? "warning"
+                            : "info"
+                      }
+                    >
+                      {item.type}
+                    </Badge>
+                    <span className="flex-1 leading-snug">{item.title}</span>
+                  </Link>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-      {inventory.lowStockAlerts.length > 0 && (
+      {showLowStockPanel(role) && inventory.lowStockAlerts.length > 0 && (
         <Card className="mb-8 border-[var(--warning)]/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-[var(--warning)]">
@@ -196,12 +181,14 @@ export default async function DashboardPage() {
       )}
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <QuickAction href="/labour/attendance" icon={Users} label="Mark Attendance" />
-        <QuickAction href="/production" icon={Wrench} label="Production Board" />
-        <QuickAction href="/inventory/slabs" icon={Package} label="Slab Inventory" />
-        <QuickAction href="/ewb" icon={Truck} label="E-Way Bills" />
-        <QuickAction href="/labour/tasks" icon={ClipboardList} label="Task Board" />
-        <QuickAction href="/invoices" icon={IndianRupee} label="Invoices" />
+        {quickActions.map((action) => (
+          <QuickAction
+            key={action.href}
+            href={action.href}
+            icon={quickActionIcons[action.href] ?? ClipboardList}
+            label={action.label}
+          />
+        ))}
       </div>
     </div>
   );

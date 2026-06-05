@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ArrowLeft, Box } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusChip, Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { EmptyState } from "@/components/ui/empty-state";
 import { stageProgress } from "@/lib/orders";
 import { PRODUCTION_STAGES } from "@/components/ui/kanban";
+import { fetchJson } from "@/lib/client-fetch";
 
 type OrderDetail = {
   id: string;
@@ -31,34 +34,111 @@ type OrderDetail = {
   reservedSlabs: { slabCode: string; product: { name: string; category: string } }[];
 };
 
+type PageStatus = "loading" | "success" | "error" | "not_found";
+
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const [orderId, setOrderId] = useState<string | null>(null);
   const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [status, setStatus] = useState<PageStatus>("loading");
+  const [error, setError] = useState<string | null>(null);
+  const [advancing, setAdvancing] = useState(false);
+
+  const load = useCallback(async (id: string) => {
+    setStatus("loading");
+    setError(null);
+    const result = await fetchJson<{ order: OrderDetail }>(`/api/orders/${id}`);
+    if (!result.ok) {
+      if (result.status === 404) {
+        setStatus("not_found");
+        setOrder(null);
+        return;
+      }
+      setStatus("error");
+      setError(result.error);
+      setOrder(null);
+      return;
+    }
+    setOrder(result.data.order);
+    setStatus("success");
+  }, []);
 
   useEffect(() => {
+    let cancelled = false;
     params.then((p) => {
-      fetch(`/api/orders/${p.id}`)
-        .then((r) => r.json())
-        .then((d) => setOrder(d.order));
+      if (cancelled) return;
+      setOrderId(p.id);
+      load(p.id);
     });
-  }, [params]);
+    return () => {
+      cancelled = true;
+    };
+  }, [params, load]);
 
   async function advanceStage() {
     if (!order) return;
-    await fetch("/api/orders", {
+    setAdvancing(true);
+    const patch = await fetchJson("/api/orders", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: order.id, action: "advance" }),
     });
-    const res = await fetch(`/api/orders/${order.id}`);
-    const d = await res.json();
-    setOrder(d.order);
+    if (!patch.ok) {
+      setAdvancing(false);
+      setError(patch.error);
+      return;
+    }
+    await load(order.id);
+    setAdvancing(false);
   }
 
-  if (!order) {
+  if (status === "loading") {
     return (
-      <div className="animate-pulse space-y-4">
+      <div className="animate-pulse space-y-4" aria-busy="true" aria-label="Loading order">
         <div className="h-8 w-48 bg-[var(--surface-3)] rounded" />
         <div className="h-64 bg-[var(--surface-3)] rounded" />
+      </div>
+    );
+  }
+
+  if (status === "not_found") {
+    return (
+      <div>
+        <PageHeader
+          title="Order not found"
+          description="This order may have been removed or the link is incorrect"
+          breadcrumbs={[
+            { label: "Orders", href: "/orders" },
+            { label: "Not found" },
+          ]}
+        />
+        <EmptyState
+          icon={Box}
+          title="Order not found"
+          description="Check the order number or return to the orders list."
+          actionHref="/orders"
+          actionLabel="Back to orders"
+        />
+      </div>
+    );
+  }
+
+  if (status === "error" || !order) {
+    return (
+      <div>
+        <PageHeader
+          title="Order unavailable"
+          description="Could not load order details"
+          breadcrumbs={[
+            { label: "Orders", href: "/orders" },
+            { label: "Error" },
+          ]}
+        />
+        <Alert variant="danger" onRetry={() => orderId && load(orderId)}>
+          {error ?? "Could not load this order"}
+        </Alert>
+        <Link href="/orders">
+          <Button variant="secondary">Back to orders</Button>
+        </Link>
       </div>
     );
   }
@@ -81,11 +161,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </Button>
             </Link>
             {order.stage !== "delivered" && (
-              <Button onClick={advanceStage}>Advance Stage</Button>
+              <Button onClick={advanceStage} loading={advancing}>
+                Advance Stage
+              </Button>
             )}
           </>
         }
       />
+
+      {error && (
+        <Alert variant="danger" onRetry={() => load(order.id)}>
+          {error}
+        </Alert>
+      )}
 
       {order.delayed && (
         <div className="mb-6 rounded-[var(--radius-lg)] border border-[var(--danger)]/30 bg-[var(--danger-subtle)] px-4 py-3 text-[var(--text-sm)] text-[var(--danger)]">

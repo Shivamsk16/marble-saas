@@ -1,3 +1,5 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 
 export function Sparkline({
@@ -47,8 +49,7 @@ export function Sparkline({
 export function BarChart({
   data,
   labels,
-  width = 280,
-  height = 120,
+  height = 140,
   className,
 }: {
   data: number[];
@@ -58,40 +59,52 @@ export function BarChart({
   className?: string;
 }) {
   const max = Math.max(...data, 1);
-  const barWidth = (width - (data.length - 1) * 4) / data.length;
+  const barCount = data.length || 1;
+  const viewWidth = 480;
+  const barGap = 4;
+  const barWidth = (viewWidth - (barCount - 1) * barGap) / barCount;
 
   return (
-    <svg width={width} height={height} className={className} role="img" aria-label="Bar chart">
-      {data.map((v, i) => {
-        const barH = (v / max) * (height - 24);
-        const x = i * (barWidth + 4);
-        const y = height - barH - 16;
-        return (
-          <g key={i}>
-            <rect
-              x={x}
-              y={y}
-              width={barWidth}
-              height={barH}
-              rx={3}
-              fill="var(--accent)"
-              opacity={0.85}
-            />
-            {labels?.[i] && (
-              <text
-                x={x + barWidth / 2}
-                y={height - 2}
-                textAnchor="middle"
-                className="fill-[var(--text-subtle)]"
-                fontSize="10"
-              >
-                {labels[i]}
-              </text>
-            )}
-          </g>
-        );
-      })}
-    </svg>
+    <div className={cn("w-full", className)}>
+      <svg
+        viewBox={`0 0 ${viewWidth} ${height}`}
+        width="100%"
+        height={height}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="Bar chart"
+      >
+        {data.map((v, i) => {
+          const barH = (v / max) * (height - 24);
+          const x = i * (barWidth + barGap);
+          const y = height - barH - 16;
+          return (
+            <g key={i}>
+              <rect
+                x={x}
+                y={y}
+                width={barWidth}
+                height={barH}
+                rx={3}
+                fill="var(--accent)"
+                opacity={0.85}
+              />
+              {labels?.[i] && (
+                <text
+                  x={x + barWidth / 2}
+                  y={height - 2}
+                  textAnchor="middle"
+                  className="fill-[var(--text-subtle)]"
+                  fontSize="10"
+                >
+                  {labels[i]}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
   );
 }
 

@@ -10,6 +10,8 @@ import { StatusChip, Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { stageProgress, stageLabel } from "@/lib/orders";
 import { useClientFetch } from "@/lib/client-fetch";
+import { usePermissions } from "@/components/permissions-provider";
+import { PERMISSIONS } from "@/lib/permissions";
 import { useState } from "react";
 
 type OrderRow = {
@@ -28,6 +30,7 @@ type OrderRow = {
 };
 
 export default function OrdersPage() {
+  const { can } = usePermissions();
   const [stageFilter, setStageFilter] = useState("all");
   const query = stageFilter !== "all" ? `?stage=${stageFilter}` : "";
   const { data, loading, error, retry } = useClientFetch<{ orders: OrderRow[] }>(
@@ -107,7 +110,11 @@ export default function OrdersPage() {
       id: "amount",
       header: "Amount",
       accessor: (row) =>
-        row.totalAmount ? `₹${row.totalAmount.toLocaleString("en-IN")}` : "—",
+        row.totalAmount ? (
+          <span className="tabular-nums">₹{row.totalAmount.toLocaleString("en-IN")}</span>
+        ) : (
+          "—"
+        ),
       sortValue: (row) => row.totalAmount ?? 0,
     },
   ];
@@ -119,15 +126,19 @@ export default function OrdersPage() {
         description="Customer orders with production status, payments, and delivery schedule"
         actions={
           <>
-            <Link href="/production">
-              <Button variant="secondary">Production Board</Button>
-            </Link>
-            <Link href="/orders/new">
-              <Button>
-                <Plus className="h-4 w-4" />
-                New Order
-              </Button>
-            </Link>
+            {can(PERMISSIONS.orders_read) && (
+              <Link href="/production">
+                <Button variant="secondary">Production Board</Button>
+              </Link>
+            )}
+            {can(PERMISSIONS.orders_create) && (
+              <Link href="/orders/new">
+                <Button>
+                  <Plus className="h-4 w-4" />
+                  New Order
+                </Button>
+              </Link>
+            )}
           </>
         }
         filters={
@@ -165,7 +176,7 @@ export default function OrdersPage() {
         emptyIcon={Box}
         emptyTitle="No orders"
         emptyDescription="Create your first customer order to start the production workflow."
-        emptyActionHref="/orders/new"
+        emptyActionHref={can(PERMISSIONS.orders_create) ? "/orders/new" : undefined}
         emptyActionLabel="New order"
         rowActions={(row) => [
           { label: "View details", href: `/orders/${row.id}` },

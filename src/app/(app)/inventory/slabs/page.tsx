@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { Package, Plus } from "lucide-react";
@@ -46,7 +47,7 @@ export default function InventorySlabsPage() {
       header: "",
       accessor: (row) =>
         row.product.imageUrl ? (
-          <img src={row.product.imageUrl} alt="" className="h-10 w-14 rounded object-cover" />
+          <Image src={row.product.imageUrl} alt="" width={56} height={40} className="h-10 w-14 rounded object-cover" />
         ) : (
           <div className="h-10 w-14 rounded bg-[var(--surface-3)]" />
         ),
@@ -195,9 +196,11 @@ export default function InventorySlabsPage() {
             : filtered.map((slab) => (
                 <Card key={slab.id} className="overflow-hidden">
                   {slab.product.imageUrl ? (
-                    <img
+                    <Image
                       src={slab.product.imageUrl}
                       alt={slab.product.name}
+                      width={400}
+                      height={128}
                       className="h-32 w-full object-cover"
                     />
                   ) : (

@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { requireSession } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 import { apiError } from "@/lib/api-utils";
 import { nextOrderNumber, nextStage, PRODUCTION_STAGES } from "@/lib/orders";
 import { isOrderDelayed } from "@/lib/orders";
 
 export async function GET(request: Request) {
   try {
-    const session = await requireSession();
+    const session = await requirePermission(PERMISSIONS.orders_read);
     const { searchParams } = new URL(request.url);
     const stage = searchParams.get("stage");
     const clientId = searchParams.get("clientId");
@@ -64,7 +65,7 @@ const createSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const session = await requireSession();
+    const session = await requirePermission(PERMISSIONS.orders_create);
     const data = createSchema.parse(await request.json());
     const orderNumber = await nextOrderNumber(session.tenantId);
 
@@ -123,7 +124,7 @@ const patchSchema = z.object({
 
 export async function PATCH(request: Request) {
   try {
-    const session = await requireSession();
+    const session = await requirePermission(PERMISSIONS.orders_update);
     const data = patchSchema.parse(await request.json());
 
     const existing = await prisma.order.findFirst({

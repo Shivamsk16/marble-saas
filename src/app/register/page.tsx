@@ -3,29 +3,50 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
     setError("");
     const fd = new FormData(e.currentTarget);
+    const fullName = String(fd.get("fullName") ?? "").trim();
+    const businessName = String(fd.get("businessName") ?? "").trim();
+    const slug = String(fd.get("slug") ?? "").trim();
+    const email = String(fd.get("email") ?? "").trim();
+    const password = String(fd.get("password") ?? "");
+
+    const nextErrors: Record<string, string> = {};
+    if (!fullName) nextErrors["register-full-name"] = "Your name is required";
+    if (!businessName) nextErrors["register-business-name"] = "Business name is required";
+    if (!slug) nextErrors["register-slug"] = "Workspace URL is required";
+    else if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
+      nextErrors["register-slug"] = "Use lowercase letters, numbers, and hyphens only";
+    }
+    if (!email) nextErrors["register-email"] = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      nextErrors["register-email"] = "Enter a valid email address";
+    }
+    if (!password) nextErrors["register-password"] = "Password is required";
+    else if (password.length < 8) {
+      nextErrors["register-password"] = "Password must be at least 8 characters";
+    }
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
+
+    setLoading(true);
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: fd.get("email"),
-        password: fd.get("password"),
-        fullName: fd.get("fullName"),
-        businessName: fd.get("businessName"),
-        slug: fd.get("slug"),
-      }),
+      body: JSON.stringify({ email, password, fullName, businessName, slug }),
     });
     setLoading(false);
     if (!res.ok) {
@@ -55,7 +76,7 @@ export default function RegisterPage() {
       </div>
 
       <div className="flex-1 flex items-center justify-center p-6 md:p-12">
-        <form onSubmit={onSubmit} className="w-full max-w-md">
+        <form onSubmit={onSubmit} className="w-full max-w-md" noValidate>
           <div className="lg:hidden mb-8">
             <p className="text-xl font-bold text-[var(--accent)]">MarblePro</p>
           </div>
@@ -63,23 +84,28 @@ export default function RegisterPage() {
           <p className="text-[var(--text-sm)] text-[var(--text-muted)] mb-8">
             14 days free · Inventory + dashboard included
           </p>
-          {error && (
-            <div className="text-[var(--text-sm)] text-[var(--danger)] mb-4 bg-[var(--danger-subtle)] rounded-[var(--radius-md)] p-3">
-              {error}
-            </div>
-          )}
-          <label htmlFor="register-full-name" className="block text-[var(--text-sm)] font-medium mb-1.5">Your name</label>
-          <Input id="register-full-name" name="fullName" required className="mb-4" autoComplete="name" />
-          <label htmlFor="register-business-name" className="block text-[var(--text-sm)] font-medium mb-1.5">Business name</label>
-          <Input id="register-business-name" name="businessName" required className="mb-4" autoComplete="organization" />
-          <label htmlFor="register-slug" className="block text-[var(--text-sm)] font-medium mb-1.5">
-            Workspace URL <span className="text-[var(--text-muted)] font-normal">(lowercase, hyphens)</span>
-          </label>
-          <Input id="register-slug" name="slug" placeholder="sharma-stone-works" pattern="[a-z0-9]+(-[a-z0-9]+)*" className="mb-4" />
-          <label htmlFor="register-email" className="block text-[var(--text-sm)] font-medium mb-1.5">Email</label>
-          <Input id="register-email" name="email" type="email" required className="mb-4" autoComplete="email" />
-          <label htmlFor="register-password" className="block text-[var(--text-sm)] font-medium mb-1.5">Password (min 8)</label>
-          <Input id="register-password" name="password" type="password" minLength={8} required className="mb-8" autoComplete="new-password" />
+          {error && <Alert variant="danger" className="mb-4">{error}</Alert>}
+          <FormField label="Your name" htmlFor="register-full-name" required error={fieldErrors["register-full-name"]} className="mb-4">
+            <Input name="fullName" autoComplete="name" />
+          </FormField>
+          <FormField label="Business name" htmlFor="register-business-name" required error={fieldErrors["register-business-name"]} className="mb-4">
+            <Input name="businessName" autoComplete="organization" />
+          </FormField>
+          <FormField
+            label="Workspace URL (lowercase, hyphens)"
+            htmlFor="register-slug"
+            required
+            error={fieldErrors["register-slug"]}
+            className="mb-4"
+          >
+            <Input name="slug" placeholder="sharma-stone-works" />
+          </FormField>
+          <FormField label="Email" htmlFor="register-email" required error={fieldErrors["register-email"]} className="mb-4">
+            <Input name="email" type="email" autoComplete="email" />
+          </FormField>
+          <FormField label="Password (min 8)" htmlFor="register-password" required error={fieldErrors["register-password"]} className="mb-8">
+            <Input name="password" type="password" autoComplete="new-password" />
+          </FormField>
           <Button type="submit" disabled={loading} loading={loading} className="w-full h-12">
             Create workspace
           </Button>

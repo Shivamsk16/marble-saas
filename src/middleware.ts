@@ -9,8 +9,17 @@ const PUBLIC_PATHS = [
   "/register",
   "/api/auth/login",
   "/api/auth/register",
+  "/api/auth/session",
   "/api/reminders/run",
+  "/api/webhooks/stripe",
 ];
+
+function isPublicPath(pathname: string) {
+  if (PUBLIC_PATHS.some((p) => pathname === p)) return true;
+  if (pathname.startsWith("/accept-invite/")) return true;
+  if (pathname.startsWith("/api/invitations/")) return true;
+  return false;
+}
 
 function getSecret() {
   return new TextEncoder().encode(
@@ -22,7 +31,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
-    PUBLIC_PATHS.some((p) => pathname === p) ||
+    isPublicPath(pathname) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
   ) {

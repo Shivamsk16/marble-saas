@@ -16,7 +16,7 @@ const createSchema = z.object({
 
 export async function GET() {
   try {
-    const session = await requirePermission(PERMISSIONS.invoice_read);
+    const session = await requirePermission(PERMISSIONS.clients_read);
     const clients = await prisma.client.findMany({
       where: { tenantId: session.tenantId },
       orderBy: { name: "asc" },
@@ -29,7 +29,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const session = await requirePermission(PERMISSIONS.invoice_write);
+    const session = await requirePermission(PERMISSIONS.clients_create);
     const data = createSchema.parse(await request.json());
     const client = await prisma.client.create({
       data: { tenantId: session.tenantId, ...data },

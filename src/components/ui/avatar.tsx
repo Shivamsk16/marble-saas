@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 export function Avatar({
@@ -25,10 +26,14 @@ export function Avatar({
   }[size];
 
   if (src) {
+    const dim = size === "sm" ? 32 : size === "lg" ? 48 : 40;
     return (
-      <img
+      <Image
         src={src}
         alt={name}
+        width={dim}
+        height={dim}
+        unoptimized={src.startsWith("data:")}
         className={cn("rounded-full object-cover", sizeClass, className)}
       />
     );

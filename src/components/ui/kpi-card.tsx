@@ -31,7 +31,7 @@ export function KpiCard({
     >
       <p className="text-[var(--text-sm)] text-[var(--text-muted)] font-medium mb-1">{label}</p>
       <div className="flex items-end justify-between gap-2">
-        <p className="text-h2 text-[var(--text)] tabular-nums">{value}</p>
+        <p className="text-h2 text-[var(--text)] tabular-nums lining-nums">{value}</p>
         {sparklineData && sparklineData.length > 1 && (
           <Sparkline data={sparklineData} width={64} height={24} />
         )}

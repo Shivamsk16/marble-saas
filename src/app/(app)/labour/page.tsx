@@ -11,6 +11,8 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { StatusChip } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { useClientFetch } from "@/lib/client-fetch";
+import { usePermissions } from "@/components/permissions-provider";
+import { PERMISSIONS } from "@/lib/permissions";
 
 type WorkerStat = {
   id: string;
@@ -39,6 +41,7 @@ type LabourData = {
 };
 
 export default function LabourPage() {
+  const { can } = usePermissions();
   const { data, loading, error, retry } = useClientFetch<LabourData>("/api/labour/productivity");
 
   const columns: Column<WorkerStat>[] = [
@@ -84,7 +87,9 @@ export default function LabourPage() {
     {
       id: "wage",
       header: "Est. Wage",
-      accessor: (row) => `₹${Math.round(row.grossWage).toLocaleString("en-IN")}`,
+      accessor: (row) => (
+        <span className="tabular-nums">₹{Math.round(row.grossWage).toLocaleString("en-IN")}</span>
+      ),
       sortValue: (row) => row.grossWage,
     },
     {
@@ -101,8 +106,13 @@ export default function LabourPage() {
         description="Attendance, productivity, wages, and task assignments"
         actions={
           <>
+            {can(PERMISSIONS.labour_write) && (
+              <Link href="/labour/workers/new">
+                <Button>Add Worker</Button>
+              </Link>
+            )}
             <Link href="/labour/attendance">
-              <Button>Attendance</Button>
+              <Button variant="secondary">Attendance</Button>
             </Link>
             <Link href="/labour/tasks">
               <Button variant="secondary">Tasks</Button>
@@ -139,6 +149,8 @@ export default function LabourPage() {
         emptyIcon={Users}
         emptyTitle="No labour records"
         emptyDescription="Add workers to track attendance, tasks, and wages."
+        emptyActionHref={can(PERMISSIONS.labour_write) ? "/labour/workers/new" : undefined}
+        emptyActionLabel="Add worker"
       />
     </div>
   );

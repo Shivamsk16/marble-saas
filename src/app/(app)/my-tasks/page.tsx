@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Camera, CheckCircle2 } from "lucide-react";
+import Image from "next/image";
+import { Camera, CheckCircle2, ClipboardList } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/components/ui/toast";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ClipboardList } from "lucide-react";
+import { fetchJson, useClientFetch } from "@/lib/client-fetch";
 
 type Task = {
   id: string;
@@ -19,37 +20,46 @@ type Task = {
 
 export default function MyTasksPage() {
   const { toast } = useToast();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  function load() {
-    fetch("/api/labour/tasks?mine=true&status=open")
-      .then((r) => r.json())
-      .then((d) => setTasks(d.tasks ?? []))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data, loading, error, retry, setData } = useClientFetch<{ tasks: Task[] }>(
+    "/api/labour/tasks?mine=true&status=open"
+  );
+  const tasks = data?.tasks ?? [];
 
   async function markDone(id: string) {
-    setTasks((t) => t.filter((x) => x.id !== id));
-    await fetch("/api/labour/tasks", {
+    setData((prev) =>
+      prev ? { tasks: prev.tasks.filter((x) => x.id !== id) } : prev
+    );
+    const result = await fetchJson("/api/labour/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status: "done" }),
     });
+    if (!result.ok) {
+      toast(result.error, "error");
+      retry();
+      return;
+    }
     toast("Task completed!", "success");
   }
 
   async function markInProgress(id: string) {
-    setTasks((t) => t.map((x) => (x.id === id ? { ...x, status: "in_progress" } : x)));
-    await fetch("/api/labour/tasks", {
+    setData((prev) =>
+      prev
+        ? {
+            tasks: prev.tasks.map((x) => (x.id === id ? { ...x, status: "in_progress" } : x)),
+          }
+        : prev
+    );
+    const result = await fetchJson("/api/labour/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status: "in_progress" }),
     });
+    if (!result.ok) {
+      toast(result.error, "error");
+      retry();
+      return;
+    }
     toast("Progress updated", "success");
   }
 
@@ -64,12 +74,23 @@ export default function MyTasksPage() {
       const reader = new FileReader();
       reader.onload = async () => {
         const photoUrl = reader.result as string;
-        setTasks((t) => t.map((x) => (x.id === id ? { ...x, photoUrl } : x)));
-        await fetch("/api/labour/tasks", {
+        setData((prev) =>
+          prev
+            ? {
+                tasks: prev.tasks.map((x) => (x.id === id ? { ...x, photoUrl } : x)),
+              }
+            : prev
+        );
+        const result = await fetchJson("/api/labour/tasks", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id, photoUrl }),
         });
+        if (!result.ok) {
+          toast(result.error, "error");
+          retry();
+          return;
+        }
         toast("Photo uploaded", "success");
       };
       reader.readAsDataURL(file);
@@ -90,6 +111,8 @@ export default function MyTasksPage() {
   return (
     <div className="max-w-lg mx-auto pb-8">
       <PageHeader title="My Tasks" description="Complete your assigned work quickly" />
+
+      {error && <Alert variant="danger" onRetry={retry}>{error}</Alert>}
 
       {tasks.length === 0 ? (
         <EmptyState
@@ -125,7 +148,14 @@ export default function MyTasksPage() {
               )}
 
               {t.photoUrl && (
-                <img src={t.photoUrl} alt="Work photo" className="w-full h-40 object-cover rounded-[var(--radius-md)] mb-3" />
+                <Image
+                  src={t.photoUrl}
+                  alt="Work photo"
+                  width={600}
+                  height={160}
+                  unoptimized
+                  className="w-full h-40 object-cover rounded-[var(--radius-md)] mb-3"
+                />
               )}
 
               <div className="grid grid-cols-2 gap-2">

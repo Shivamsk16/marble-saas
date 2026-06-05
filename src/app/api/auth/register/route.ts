@@ -64,7 +64,9 @@ export async function POST(request: Request) {
           slug,
           plan: "trial",
           status: "active",
+          subscriptionStatus: "trial",
           trialEndsAt: trialEnds,
+          seatLimit: 5,
         },
       });
 

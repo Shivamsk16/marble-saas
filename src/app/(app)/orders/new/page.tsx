@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/ui/empty-state";
+import { fetchJson } from "@/lib/client-fetch";
 import { Users } from "lucide-react";
 
 type Client = { id: string; name: string };
@@ -46,6 +49,7 @@ export default function NewOrderPage() {
   const [lines, setLines] = useState<LineItem[]>([emptyLine()]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     Promise.all([
@@ -62,16 +66,22 @@ export default function NewOrderPage() {
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
     setError("");
 
+    const nextErrors: Record<string, string> = {};
+    if (!clientId) nextErrors["order-client"] = "Select a client";
+    if (!title.trim()) nextErrors["order-title"] = "Order title is required";
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
+
+    setLoading(true);
     const validLines = lines.filter((l) => l.description.trim() && l.quantity > 0);
-    const res = await fetch("/api/orders", {
+    const result = await fetchJson<{ order: { id: string } }>("/api/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         clientId,
-        title,
+        title: title.trim(),
         priority,
         materialNotes: materialNotes || undefined,
         expectedCompletion: expectedCompletion || undefined,
@@ -90,12 +100,11 @@ export default function NewOrderPage() {
       }),
     });
     setLoading(false);
-    const data = await res.json();
-    if (!res.ok) {
-      setError(typeof data.error === "string" ? data.error : "Could not create order");
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-    router.push(`/orders/${data.order.id}`);
+    router.push(`/orders/${result.data.order.id}`);
     router.refresh();
   }
 
@@ -131,19 +140,10 @@ export default function NewOrderPage() {
           { label: "New order" },
         ]}
       />
-      {error && (
-        <div className="text-[var(--text-sm)] text-[var(--danger)] mb-4 bg-[var(--danger-subtle)] rounded-[var(--radius-md)] p-3">
-          {error}
-        </div>
-      )}
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="order-client" className="block text-[var(--text-sm)] font-medium mb-1.5">
-            Client *
-          </label>
+      {error && <Alert variant="danger">{error}</Alert>}
+      <form onSubmit={onSubmit} className="space-y-4" noValidate>
+        <FormField label="Client" htmlFor="order-client" required error={fieldErrors["order-client"]}>
           <Select
-            id="order-client"
-            required
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
             disabled={clientsLoading}
@@ -155,19 +155,14 @@ export default function NewOrderPage() {
               </option>
             ))}
           </Select>
-        </div>
-        <div>
-          <label htmlFor="order-title" className="block text-[var(--text-sm)] font-medium mb-1.5">
-            Order title *
-          </label>
+        </FormField>
+        <FormField label="Order title" htmlFor="order-title" required error={fieldErrors["order-title"]}>
           <Input
-            id="order-title"
-            required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Kitchen countertop — Sharma residence"
           />
-        </div>
+        </FormField>
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label htmlFor="order-priority" className="block text-[var(--text-sm)] font-medium mb-1.5">

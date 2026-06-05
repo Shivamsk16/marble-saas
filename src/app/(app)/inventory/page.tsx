@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
 import { Package, Plus } from "lucide-react";
@@ -50,7 +51,7 @@ export default function InventoryPage() {
       header: "",
       accessor: (row) =>
         row.imageUrl ? (
-          <img src={row.imageUrl} alt="" className="h-10 w-14 rounded object-cover" />
+          <Image src={row.imageUrl} alt="" width={56} height={40} className="h-10 w-14 rounded object-cover" />
         ) : (
           <div className="h-10 w-14 rounded bg-[var(--surface-3)]" />
         ),

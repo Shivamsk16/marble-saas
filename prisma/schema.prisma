@@ -35,10 +35,15 @@ model Tenant {
   id          String    @id @default(uuid()) @db.Uuid
   name        String
   slug        String    @unique
-  plan        String    @default("trial") // trial | starter | professional | enterprise
-  status      String    @default("pending") // pending | active | suspended
-  trialEndsAt DateTime? @map("trial_ends_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
+  plan               String    @default("trial") // trial | starter | professional | enterprise
+  status             String    @default("pending") // pending | active | suspended
+  subscriptionStatus String  @default("trial") @map("subscription_status") // trial | active | expired | cancelled
+  trialEndsAt        DateTime? @map("trial_ends_at")
+  renewalDate        DateTime? @map("renewal_date")
+  seatLimit              Int       @default(5) @map("seat_limit")
+  stripeCustomerId       String?   @unique @map("stripe_customer_id")
+  stripeSubscriptionId   String?   @unique @map("stripe_subscription_id")
+  createdAt              DateTime  @default(now()) @map("created_at")
 
   settings    TenantSettings?
   roles       Role[]
@@ -67,8 +72,24 @@ model Tenant {
   wageRecords        WageRecord[]
   orders             Order[]
   notifications      Notification[]
+  billingHistories   BillingHistory[]
 
   @@map("tenants")
+}
+
+model BillingHistory {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  description String
+  amount      Decimal  @db.Decimal(12, 2)
+  status      String   @default("paid") // paid | pending | failed
+  plan        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("billing_history")
 }
 
 model TenantSettings {
@@ -316,10 +337,12 @@ model Worker {
   id           String    @id @default(uuid()) @db.Uuid
   tenantId     String    @map("tenant_id") @db.Uuid
   userId       String?   @map("user_id") @db.Uuid
-  name         String
-  phone        String?
-  role         String    // cutter_operator | loader | polisher | helper
-  dailyWage    Decimal?  @map("daily_wage") @db.Decimal(10, 2)
+  name              String
+  phone             String?
+  address           String?
+  emergencyContact  String?   @map("emergency_contact")
+  role              String    // cutter_operator | loader | polisher | helper
+  dailyWage         Decimal?  @map("daily_wage") @db.Decimal(10, 2)
   monthlySalary Decimal? @map("monthly_salary") @db.Decimal(12, 2)
   joiningDate  DateTime? @map("joining_date") @db.Date
   isActive     Boolean   @default(true) @map("is_active")

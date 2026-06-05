@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireSession } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 import { apiError } from "@/lib/api-utils";
 import { isOrderDelayed } from "@/lib/orders";
 
@@ -9,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireSession();
+    const session = await requirePermission(PERMISSIONS.orders_read);
     const { id } = await params;
 
     const order = await prisma.order.findFirst({
@@ -37,6 +38,26 @@ export async function GET(
         delayed: isOrderDelayed(order.stage, order.expectedCompletion, order.deliveryDate),
       },
     });
+  } catch (e) {
+    return apiError(e);
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await requirePermission(PERMISSIONS.orders_delete);
+    const { id } = await params;
+
+    const order = await prisma.order.findFirst({
+      where: { id, tenantId: session.tenantId },
+    });
+    if (!order) throw new Error("NOT_FOUND");
+
+    await prisma.order.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
   } catch (e) {
     return apiError(e);
   }

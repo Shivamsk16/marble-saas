@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Bell, CheckCheck } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import Link from "next/link";
 import { useToast } from "@/components/ui/toast";
+import { fetchJson, useClientFetch } from "@/lib/client-fetch";
 
 type Notification = {
   id: string;
@@ -22,38 +23,43 @@ type Notification = {
 
 export default function RemindersPage() {
   const { toast } = useToast();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  function load() {
-    fetch("/api/notifications")
-      .then((r) => r.json())
-      .then((d) => setNotifications(d.notifications ?? []))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data, loading, error, retry, setData } = useClientFetch<{ notifications: Notification[] }>(
+    "/api/notifications"
+  );
+  const notifications = data?.notifications ?? [];
 
   async function markAllRead() {
-    await fetch("/api/notifications", {
+    const result = await fetchJson("/api/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ markAllRead: true }),
     });
-    load();
+    if (!result.ok) {
+      toast(result.error, "error");
+      return;
+    }
+    retry();
     toast("All notifications marked as read", "success");
   }
 
   async function markRead(id: string) {
-    await fetch("/api/notifications", {
+    const result = await fetchJson("/api/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
-    setNotifications((n) =>
-      n.map((x) => (x.id === id ? { ...x, readAt: new Date().toISOString() } : x))
+    if (!result.ok) {
+      toast(result.error, "error");
+      return;
+    }
+    setData((prev) =>
+      prev
+        ? {
+            notifications: prev.notifications.map((x) =>
+              x.id === id ? { ...x, readAt: new Date().toISOString() } : x
+            ),
+          }
+        : prev
     );
   }
 
@@ -66,12 +72,14 @@ export default function RemindersPage() {
         title="Notifications"
         description="Payment reminders, production alerts, inventory warnings, and delivery notices"
         actions={
-          <Button variant="secondary" onClick={markAllRead}>
+          <Button variant="secondary" onClick={markAllRead} disabled={loading || notifications.length === 0}>
             <CheckCheck className="h-4 w-4" />
             Mark all read
           </Button>
         }
       />
+
+      {error && <Alert variant="danger" onRetry={retry}>{error}</Alert>}
 
       {loading ? (
         <div className="space-y-3">

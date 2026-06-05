@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
-import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import { requirePermission } from "@/lib/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 import {
   getProductionReport,
   getSalesReport,
@@ -10,14 +10,7 @@ import { apiError } from "@/lib/api-utils";
 
 export async function GET(request: Request) {
   try {
-    const session = await getSession();
-    if (!session) throw new Error("UNAUTHORIZED");
-    if (
-      !hasPermission(session.permissions, PERMISSIONS.invoice_read) &&
-      session.roleName !== "owner"
-    ) {
-      throw new Error("FORBIDDEN");
-    }
+    const session = await requirePermission(PERMISSIONS.reports_read);
 
     const type = new URL(request.url).searchParams.get("type") ?? "sales";
     const fromStr = new URL(request.url).searchParams.get("from");

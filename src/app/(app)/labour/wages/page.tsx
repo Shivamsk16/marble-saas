@@ -70,12 +70,16 @@ export default function WagesPage() {
     {
       id: "gross",
       header: "Gross",
-      accessor: (row) => `₹${Number(row.grossAmount).toLocaleString("en-IN")}`,
+      accessor: (row) => (
+        <span className="tabular-nums">₹{Number(row.grossAmount).toLocaleString("en-IN")}</span>
+      ),
     },
     {
       id: "net",
       header: "Net Pay",
-      accessor: (row) => `₹${Number(row.netAmount).toLocaleString("en-IN")}`,
+      accessor: (row) => (
+        <span className="tabular-nums font-medium">₹{Number(row.netAmount).toLocaleString("en-IN")}</span>
+      ),
       sortValue: (row) => Number(row.netAmount),
     },
   ];

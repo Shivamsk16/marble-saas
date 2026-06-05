@@ -31,15 +31,38 @@ async function main() {
     },
   });
 
+  const renewalDate = new Date();
+  renewalDate.setMonth(renewalDate.getMonth() + 1);
+
   const tenant = await prisma.tenant.upsert({
     where: { slug: "sharma-stone-works" },
-    update: {},
+    update: {
+      subscriptionStatus: "active",
+      renewalDate,
+      seatLimit: 15,
+    },
     create: {
       name: "Sharma Stone Works",
       slug: "sharma-stone-works",
       plan: "professional",
       status: "active",
+      subscriptionStatus: "active",
       trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      renewalDate,
+      seatLimit: 15,
+    },
+  });
+
+  await prisma.billingHistory.upsert({
+    where: { id: "00000000-0000-0000-0000-000000000001" },
+    update: {},
+    create: {
+      id: "00000000-0000-0000-0000-000000000001",
+      tenantId: tenant.id,
+      description: "Professional plan — monthly",
+      amount: 5999,
+      status: "paid",
+      plan: "professional",
     },
   });
 

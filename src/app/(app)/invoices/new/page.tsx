@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Users } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
@@ -43,16 +44,20 @@ export default function NewInvoicePage() {
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
+    const nextErrors: Record<string, string> = {};
+    if (!clientId) nextErrors["invoice-client"] = "Select a client";
     const validLines = lines.filter((l) => l.description.trim() && l.rate > 0 && l.quantity > 0);
     if (validLines.length === 0) {
-      setError("Add at least one line item with description, quantity, and rate.");
-      return;
+      nextErrors["invoice-lines"] = "Add at least one line item with description, quantity, and rate.";
     }
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
 
     setLoading(true);
     const result = await fetchJson<{ invoice: { id: string } }>("/api/invoices", {
@@ -114,14 +119,9 @@ export default function NewInvoicePage() {
       )}
       {error && <Alert variant="danger">{error}</Alert>}
 
-      <form onSubmit={submit} className="space-y-4">
-        <div>
-          <label htmlFor="invoice-client" className="block text-[var(--text-sm)] font-medium mb-1.5">
-            Client *
-          </label>
+      <form onSubmit={submit} className="space-y-4" noValidate>
+        <FormField label="Client" htmlFor="invoice-client" required error={fieldErrors["invoice-client"]}>
           <Select
-            id="invoice-client"
-            required
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
             disabled={clientsLoading || !!clientsError}
@@ -133,10 +133,15 @@ export default function NewInvoicePage() {
               </option>
             ))}
           </Select>
-        </div>
+        </FormField>
 
         <div className="space-y-3">
           <p className="text-[var(--text-sm)] font-medium">Line items *</p>
+          {fieldErrors["invoice-lines"] && (
+            <p id="invoice-lines-error" role="alert" className="text-[var(--text-xs)] text-[var(--danger)]">
+              {fieldErrors["invoice-lines"]}
+            </p>
+          )}
           {lines.map((l, i) => (
             <div
               key={i}
